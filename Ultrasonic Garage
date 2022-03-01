@@ -1,0 +1,319 @@
+#Ash Garcia
+#COSC Ultrasonic Smart Garage
+#Due Date: Dec 7 2021
+
+import RPi.GPIO as GPIO
+from time import sleep, time
+
+# constants
+DEBUG = False       # debug mode
+
+SETTLE_TIME = 2     # seconds to let the sensor settle
+CALIBRATIONS = 5    # number of calibration measurements to take
+CALIBRATION_DELAY = 1   # seconds to delay in between calibration measurements
+TRIGGER_TIME = 0.00001  # seconds needed to trigger the sensor (to get a measurement)
+SPEED_OF_SOUND = 343    # speed of sound in m/s
+
+# set the RPi to the Broadcom pin layout
+GPIO.setmode(GPIO.BCM)
+
+# GPIO pins
+TRIG = 18           # the sensor's TRIG pin
+ECHO = 27           # the sensor's ECHO pin
+RedLED = 12         # the Red led's pin
+YellowLED = 13      # the Yellow led's pin
+GreenLED = 17       # the Green led's pin
+TLED1 = 19          # the 1st White led's pin
+TLED2 = 20          # the 2nd White led's pin
+TLED3 = 21          # the 3rd White led's pin
+TLED4 = 22          # the 4th White led's pin
+TLED5 = 23          # the 5th White led's pin
+TLED6 = 24          # the 6th White led's pin
+
+GPIO.setup(TRIG, GPIO.OUT)  # TRIG is an output
+GPIO.setup(ECHO, GPIO.IN)   # ECHO is an input
+GPIO.setup(RedLED, GPIO.OUT) # RedLED is an output
+GPIO.setup(YellowLED, GPIO.OUT) # YellowLED is an output
+GPIO.setup(GreenLED, GPIO.OUT) # GreenLED is an output
+GPIO.setup(TLED1, GPIO.OUT) #TLED1 is an output
+GPIO.setup(TLED2, GPIO.OUT) #TLED2 is an output
+GPIO.setup(TLED3, GPIO.OUT) #TLED3 is an output
+GPIO.setup(TLED4, GPIO.OUT) #TLED4 is an output
+GPIO.setup(TLED5, GPIO.OUT) #TLED5 is an output
+GPIO.setup(TLED6, GPIO.OUT) #TLED6 is an output
+
+# calibrates the sensor
+# technically, it returns a correction factor to use in our calculations
+def calibrate():
+    print("Calibrating...")
+    # prompt the user for an object's known distance
+    print("-Place the sensor a measured distance away from an object.")
+    known_distance = float(input("-What is the measured distance (cm)? "))
+
+    # measure the distance to the object with the sensor
+    # do this several times and get an average
+    print("-Getting calibration measurements...")
+    distance_avg = 0
+    for i in range(CALIBRATIONS):
+        distance = getDistance()
+        if (DEBUG):
+            print("--Got {}cm".format(distance))
+        # keep a running sum
+        distance_avg += distance
+        # delay a short time before using the sensor again
+        sleep(CALIBRATION_DELAY)
+    # calculate the average of the distances
+    distance_avg /= CALIBRATIONS
+    if (DEBUG):
+        print("--Average is {}cm".format(distance_avg))
+
+    # calculate the correction factor
+    correction_factor = known_distance / distance_avg
+    if (DEBUG):
+        print("--Correction factor is {}".format(correction_factor))
+
+    print("Done.")
+    print()
+
+    return correction_factor
+
+# uses the sensor to calculate the distance to an object
+def getDistance():
+    # trigger the sensor by setting it high for a short time and then setting it low
+    GPIO.output(TRIG, GPIO.HIGH)
+    sleep(TRIGGER_TIME)
+    GPIO.output(TRIG, GPIO.LOW)
+
+    # wait for the ECHO pin to read high
+    # once the ECHO pin is high, the start time is set
+    # once the ECHO pin is low again, the end time is set
+    while (GPIO.input(ECHO) == GPIO.LOW):
+        start = time()
+    while (GPIO.input(ECHO) == GPIO.HIGH):
+        end = time()
+
+    # calculate the duration that the ECHO pin was high
+    # this is how long the pulse took to get from the sensor to the object -- and back again
+    duration = end - start
+    # calculate the total distance that the pulse traveled by factoring in the speed of sound (m/s)
+    distance = duration * SPEED_OF_SOUND
+    # the distance from the sensor to the object is half of the total distance traveled
+    distance /= 2
+    # convert from meters to centimeters
+    distance *= 100
+
+    return distance
+
+# sorts the list of measured/calculated values using the insertion sort
+def sort(lst):
+    for i in range(0, len(lst)-1):
+        minPosition = i
+
+        for j in range(i+1, len(lst)):
+            if (lst[j] < lst[minPosition]):
+                minPosition = j
+
+        temp = lst[i]
+        lst[i] = lst[minPosition]
+        lst[minPosition] = temp
+
+    return lst
+
+########
+# MAIN #
+########
+# first, allow the sensor to settle for a bit
+print("Waiting for sensor to settle ({}s)...".format(SETTLE_TIME))
+GPIO.output(TRIG, GPIO.LOW)
+sleep(SETTLE_TIME)
+
+# next, calibrate the sensor
+correction_factor = calibrate()
+
+# then, measure
+values = [] # store the measured/calculated values
+input("Press enter to begin...")
+print("Getting measurements:")
+while (True):
+    # get the distance to an object and correct it with the correction factor
+    print("-Measuring...")
+    distance = getDistance() * correction_factor
+    
+
+    # and round to four decimal places
+    distance = round(distance, 4)
+    print(distance)
+  
+#when distance is less than 7
+    if distance <=7:
+        GPIO.output(RedLED, 1) #Red Led is on
+        GPIO.output(YellowLED, 0) #Yellow Led is off
+        GPIO.output(GreenLED, 0) #Green Led is off
+#All six leds turn on and off for 0.01s in the order of code as red light stays on
+        GPIO.output(TLED1, 1) 
+        sleep(.01)
+        GPIO.output(TLED1, 0)
+        sleep(.01)
+        GPIO.output(TLED3, 1)
+        sleep(.01)
+        GPIO.output(TLED3, 0)
+        sleep(.01)
+        GPIO.output(TLED5, 1)
+        sleep(.01)
+        GPIO.output(TLED5, 0)
+        sleep(.01)
+        GPIO.output(TLED2, 1)
+        sleep(.01)
+        GPIO.output(TLED2, 0)
+        sleep(.01)
+        GPIO.output(TLED4, 1)
+        sleep(.01)
+        GPIO.output(TLED4, 0)
+        sleep(.01)
+        GPIO.output(TLED6, 1)
+        sleep(.01)
+        GPIO.output(TLED6, 0)
+        sleep(.01)
+        GPIO.output(TLED1, 1)
+        sleep(.01)
+        GPIO.output(TLED1, 0)
+        sleep(.01)
+        GPIO.output(TLED3, 1)
+        sleep(.01)
+        GPIO.output(TLED3, 0)
+        sleep(.01)
+        GPIO.output(TLED5, 1)
+        sleep(.01)
+        GPIO.output(TLED5, 0)
+        sleep(.01)
+        GPIO.output(TLED2, 1)
+        sleep(.01)
+        GPIO.output(TLED2, 0)
+        sleep(.01)
+        GPIO.output(TLED4, 1)
+        sleep(.01)
+        GPIO.output(TLED4, 0)
+        sleep(.01)
+        GPIO.output(TLED6, 1)
+        sleep(.01)
+        GPIO.output(TLED6, 0)
+        sleep(.01)
+        
+#when distance is greater than 7 and less than 13
+    elif distance >=7 and distance <=13:
+        GPIO.output(YellowLED, 1) #Yellow led is on
+        GPIO.output(RedLED, 0) #Red led is off
+        GPIO.output(GreenLED, 0) #Green led is off
+#All six leds turn on and off for 0.02s in the order of code as red light stays on
+        GPIO.output(TLED1, 1)
+        sleep(.02)
+        GPIO.output(TLED1, 0)
+        sleep(.02)
+        GPIO.output(TLED3, 1)
+        sleep(.02)
+        GPIO.output(TLED3, 0)
+        sleep(.02)
+        GPIO.output(TLED5, 1)
+        sleep(.02)
+        GPIO.output(TLED5, 0)
+        sleep(.02)
+        GPIO.output(TLED2, 1)
+        sleep(.02)
+        GPIO.output(TLED2, 0)
+        sleep(.02)
+        GPIO.output(TLED4, 1)
+        sleep(.02)
+        GPIO.output(TLED4, 0)
+        sleep(.02)
+        GPIO.output(TLED6, 1)
+        sleep(.02)
+        GPIO.output(TLED6, 0)
+        sleep(.02)
+        GPIO.output(TLED1, 1)
+        sleep(.02)
+        GPIO.output(TLED1, 0)
+        sleep(.02)
+        GPIO.output(TLED3, 1)
+        sleep(.02)
+        GPIO.output(TLED3, 0)
+        sleep(.02)
+        GPIO.output(TLED5, 1)
+        sleep(.02)
+        GPIO.output(TLED5, 0)
+        sleep(.02)
+        GPIO.output(TLED2, 1)
+        sleep(.02)
+        GPIO.output(TLED2, 0)
+        sleep(.02)
+        GPIO.output(TLED4, 1)
+        sleep(.02)
+        GPIO.output(TLED4, 0)
+        sleep(.02)
+        GPIO.output(TLED6, 1)
+        sleep(.02)
+        GPIO.output(TLED6, 0)
+        sleep(.02)
+        
+#when distance is greater than 13 
+    else:
+        GPIO.output(GreenLED, 1) #Green led is on
+        GPIO.output(YellowLED, 0) #Yellow led is off
+        GPIO.output(RedLED, 0) #Red led is off
+#All six leds turn on and off for 0.03s in the order of code as red light stays on
+        GPIO.output(TLED1, 1)
+        sleep(.03)
+        GPIO.output(TLED1, 0)
+        sleep(.03)
+        GPIO.output(TLED3, 1)
+        sleep(.03)
+        GPIO.output(TLED3, 0)
+        sleep(.03)
+        GPIO.output(TLED5, 1)
+        sleep(.03)
+        GPIO.output(TLED5, 0)
+        sleep(.03)
+        GPIO.output(TLED2, 1)
+        sleep(.03)
+        GPIO.output(TLED2, 0)
+        sleep(.03)
+        GPIO.output(TLED4, 1)
+        sleep(.03)
+        GPIO.output(TLED4, 0)
+        sleep(.03)
+        GPIO.output(TLED6, 1)
+        sleep(.03)
+        GPIO.output(TLED6, 0)
+        sleep(.03)
+        GPIO.output(TLED1, 1)
+        sleep(.03)
+        GPIO.output(TLED1, 0)
+        sleep(.03)
+        GPIO.output(TLED3, 1)
+        sleep(.03)
+        GPIO.output(TLED3, 0)
+        sleep(.03)
+        GPIO.output(TLED5, 1)
+        sleep(.03)
+        GPIO.output(TLED5, 0)
+        sleep(.03)
+        GPIO.output(TLED2, 1)
+        sleep(.03)
+        GPIO.output(TLED2, 0)
+        sleep(.03)
+        GPIO.output(TLED4, 1)
+        sleep(.03)
+        GPIO.output(TLED4, 0)
+        sleep(.03)
+        GPIO.output(TLED6, 1)
+        sleep(.03)
+        GPIO.output(TLED6, 0)
+        sleep(.03)
+
+#All six white lights should create a blinking effect and shoud get faster as the distance gets smaller
+        print(distance)
+        
+    # display the distance measured/calculated
+    print("--Distance measured: {}cm".format(distance))
+
+# finally, cleanup the GPIO pins
+GPIO.cleanup()
